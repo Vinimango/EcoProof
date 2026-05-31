@@ -14,7 +14,6 @@ const eventos  = ref([])
 const loading  = ref(true)
 const showForm = ref(false)
 const saving   = ref(false)
-const emitindo = ref(null) // id do evento sendo processado
 
 const form = ref({
   titulo: '', descricao: '', local: '',
@@ -84,22 +83,6 @@ async function cancelarEvento(ev) {
   }
 }
 
-// ── Emitir NFTs em lote ─────────────────────────────────────────────────
-async function emitirNFTs(ev) {
-  emitindo.value = ev.id
-  try {
-    // ✅ Campo correto na resposta: total_emitido (não total_emitidos)
-    const r = await api.post(`/eventos/${ev.id}/emitir-nfts`)
-    const emitido = r.total_emitido ?? 0
-    const pontos  = r.pontos_distribuidos ?? 0
-    toast.success(`${emitido} NFT(s) emitido(s) · ${pontos} pontos distribuídos!`)
-    await load()
-  } catch (e) {
-    toast.error(e.message)
-  } finally {
-    emitindo.value = null
-  }
-}
 </script>
 
 <template>
@@ -187,15 +170,15 @@ async function emitirNFTs(ev) {
               Gerenciar participantes
             </RouterLink>
 
-            <button
-              class="btn btn-accent"
-              :disabled="emitindo === ev.id || ev.status !== 'ativo'"
-              :title="ev.status !== 'ativo' ? 'Evento não está ativo' : 'Emitir NFTs para aprovados'"
-              @click="emitirNFTs(ev)"
+            <!-- Badge: aprovados aguardando NFT (leva para a página do evento) -->
+            <RouterLink
+              v-if="ev.status === 'ativo' && (ev.total_participantes || 0) > 0"
+              :to="`/instituto/eventos/${ev.id}`"
+              class="badge-nft-link"
+              :title="`Acesse o evento para emitir NFTs`"
             >
-              <span v-if="emitindo === ev.id" class="spinner-sm"></span>
-              {{ emitindo === ev.id ? 'Emitindo…' : '🎖️ Emitir NFTs' }}
-            </button>
+              🎖️ Emitir NFTs
+            </RouterLink>
 
             <button
               v-if="ev.status === 'ativo'"
@@ -389,6 +372,23 @@ async function emitirNFTs(ev) {
   transition: background .15s;
 }
 .btn-danger:hover { background: #fee2e2; }
+
+/* Badge/link NFT */
+.badge-nft-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .5rem .9rem;
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+  border-radius: var(--radius-sm, 8px);
+  font-weight: 600;
+  font-size: .875rem;
+  text-decoration: none;
+  transition: background .15s;
+}
+.badge-nft-link:hover { background: #ede9fe; }
 
 /* Modal */
 .backdrop {
