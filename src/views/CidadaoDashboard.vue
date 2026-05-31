@@ -2,11 +2,15 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { api } from '../utils/api'
+import { api, apiFormData } from '../utils/api'
 import { formatDate, formatTipoAcao, formatPoints, truncateHash } from '../utils/format'
 import { useToast } from '../composables/useToast'
 import StatusBadge from '../components/StatusBadge.vue'
 import NFTCard from '../components/NFTCard.vue'
+import ImageUpload from '../components/ImageUpload.vue'
+
+// Blockchain stats
+const chainStats = ref(null)
 
 const auth = useAuthStore()
 const toast = useToast()
@@ -21,9 +25,14 @@ const loadingNFTs      = ref(true)
 const loadingPartic    = ref(true)
 
 // Wallet
-const editingWallet = ref(false)
-const walletDraft   = ref('')
-const savingWallet  = ref(false)
+const editingWallet  = ref(false)
+const walletDraft    = ref('')
+const savingWallet   = ref(false)
+
+// Envio de foto de participação
+const fotoModal      = ref(null)   // participação selecionada
+const fotoFile       = ref(null)
+const enviandoFoto   = ref(false)
 
 const META = 500
 
@@ -44,8 +53,15 @@ onMounted(async () => {
     carregarLimpezas(),
     carregarNFTs(),
     carregarParticipacoes(),
+    carregarChainStats(),
   ])
 })
+
+async function carregarChainStats() {
+  try {
+    chainStats.value = await api.get('/nfts/stats')
+  } catch { chainStats.value = null }
+}
 
 // ── Funções de carregamento ─────────────────────────────────────────────────
 async function carregarLimpezas() {
@@ -106,6 +122,33 @@ async function saveWallet() {
     toast.error(e.message)
   } finally {
     savingWallet.value = false
+  }
+}
+
+
+function abrirEnvioFoto(participacao) {
+  fotoModal.value = participacao
+  fotoFile.value  = null
+}
+
+async function enviarFotoParticipacao() {
+  if (!fotoFile.value || !fotoModal.value) return
+  enviandoFoto.value = true
+  try {
+    const fd = new FormData()
+    fd.append('foto', fotoFile.value)
+    await apiFormData(
+      `/eventos/${fotoModal.value.evento_id}/participacoes/${fotoModal.value.id}/foto`,
+      fd
+    )
+    toast.success('Foto enviada com sucesso! Aguarde a aprovação do instituto.')
+    fotoModal.value = null
+    fotoFile.value  = null
+    await carregarParticipacoes()
+  } catch (e) {
+    toast.error('Erro ao enviar foto: ' + e.message)
+  } finally {
+    enviandoFoto.value = false
   }
 }
 
@@ -175,14 +218,14 @@ function verNFT(nft) {
 
       <!-- Wallet -->
       <div class="card">
-        <h3>Wallet Ethereum</h3>
+        <h3>Wallet Polygon</h3>
         <template v-if="!editingWallet">
           <p v-if="auth.user?.wallet_address" class="mono wallet-addr">
             {{ truncateHash(auth.user.wallet_address) }}
           </p>
           <p v-else class="muted wallet-empty">
             Nenhuma wallet configurada.<br>
-            <small>Vincule sua wallet para receber NFTs on-chain.</small>
+            <small>Vincule sua wallet Polygon para receber NFTs Soulbound on-chain.</small>
           </p>
           <button id="btn-editar-wallet" class="btn btn-ghost" @click="startEdit">
             {{ auth.user?.wallet_address ? 'Editar wallet' : '+ Vincular wallet' }}
@@ -254,9 +297,34 @@ function verNFT(nft) {
     </section>
 
     <!-- ── Meus NFTs ──────────────────────────────────────────────────────── -->
+    <!-- ── Blockchain Stats ────────────────────────────────────────────── -->
+    <div v-if="chainStats" class="chain-stats-bar">
+      <div class="chain-stat">
+        <span class="chain-stat-icon">⛓️</span>
+        <div>
+          <div class="chain-stat-value">{{ chainStats.total_nfts_onchain }}</div>
+          <div class="chain-stat-label">NFTs on-chain</div>
+        </div>
+      </div>
+      <div class="chain-stat">
+        <span class="chain-stat-icon">🔐</span>
+        <div>
+          <div class="chain-stat-value">{{ chainStats.total_proofs_onchain }}</div>
+          <div class="chain-stat-label">Provas registradas</div>
+        </div>
+      </div>
+      <div class="chain-stat">
+        <span class="chain-stat-icon">{{ chainStats.blockchain_enabled ? '🟢' : '🟡' }}</span>
+        <div>
+          <div class="chain-stat-value">{{ chainStats.blockchain_enabled ? 'Ativo' : 'Simulado' }}</div>
+          <div class="chain-stat-label">Modo blockchain</div>
+        </div>
+      </div>
+    </div>
+
     <section class="section">
       <div class="section-head">
-        <h2>Meus NFTs</h2>
+        <h2>Meus NFTs <span class="soulbound-label">🔒 Soulbound</span></h2>
         <RouterLink to="/app/carteira" class="link-sm">Ver todos →</RouterLink>
       </div>
 
@@ -308,16 +376,72 @@ function verNFT(nft) {
       </div>
 
       <ul v-else class="limpeza-list">
-        <li v-for="p in participacoes" :key="p.id" class="limpeza-item">
-          <div class="limpeza-img limpeza-img-placeholder">📅</div>
+        <li v-for="p in participacoes" :key="p.id" class="limpeza-item partic-item">
+
+          <!-- Ícone / thumb -->
+          <div class="limpeza-img limpeza-img-placeholder" v-if="!p.foto_url">📅</div>
+          <img v-else :src="p.foto_url" class="limpeza-img partic-foto" alt="Foto enviada" />
+
+          <!-- Informações -->
           <div class="limpeza-info">
             <strong>{{ p.evento_titulo || 'Evento' }}</strong>
             <span class="muted">{{ formatDate(p.checkin_at) }}</span>
+            <span v-if="p.status === 'confirmado'" class="hint-foto">
+              📸 Envie a foto para avançar
+            </span>
+            <span v-else-if="p.status === 'foto_enviada'" class="hint-foto hint-aguardando">
+              ⏳ Foto enviada — aguardando aprovação
+            </span>
           </div>
-          <StatusBadge :status="p.status" />
+
+          <!-- Status + Botão -->
+          <div class="partic-right">
+            <StatusBadge :status="p.status" />
+            <button
+              v-if="p.status === 'confirmado'"
+              class="btn btn-sm-accent"
+              @click="abrirEnvioFoto(p)"
+            >
+              📸 Enviar foto
+            </button>
+          </div>
         </li>
       </ul>
     </section>
+
+    <!-- ── Modal: Envio de foto de participação ──────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="fotoModal" class="backdrop" @click.self="fotoModal = null">
+        <div class="modal-foto card">
+          <div class="modal-foto-header">
+            <div>
+              <h3>📸 Enviar foto de participação</h3>
+              <p class="muted" style="margin:.2rem 0 0;font-size:.9rem">
+                {{ fotoModal.evento_titulo || 'Evento' }}
+              </p>
+            </div>
+            <button class="btn-close" @click="fotoModal = null">✕</button>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <ImageUpload label="Foto da participação" @update:file="fotoFile = $event" />
+          </div>
+
+          <div class="modal-foto-footer">
+            <button class="btn btn-ghost" @click="fotoModal = null">Cancelar</button>
+            <button
+              id="btn-enviar-foto-participacao"
+              class="btn btn-primary"
+              :disabled="!fotoFile || enviandoFoto"
+              @click="enviarFotoParticipacao"
+            >
+              <span v-if="enviandoFoto" class="spinner-sm"></span>
+              {{ enviandoFoto ? 'Enviando…' : 'Enviar foto' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
   </div>
 </template>
@@ -460,4 +584,116 @@ function verNFT(nft) {
   vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Blockchain Stats Bar */
+.chain-stats-bar {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  border-radius: var(--radius-md, 12px);
+  color: #fff;
+}
+.chain-stat {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex: 1;
+}
+.chain-stat-icon { font-size: 1.4rem; }
+.chain-stat-value { font-size: 1.15rem; font-weight: 800; }
+.chain-stat-label { font-size: .72rem; opacity: .7; font-weight: 500; }
+
+@media (max-width: 600px) {
+  .chain-stats-bar { flex-direction: column; gap: .6rem; }
+}
+
+/* Soulbound label */
+.soulbound-label {
+  font-size: .72rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: .4rem;
+}
+
+/* ── Participação com foto ──────────────────────────────────────── */
+.partic-item { align-items: flex-start; gap: 1rem; }
+.partic-foto { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.partic-right { display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; flex-shrink: 0; }
+.hint-foto { font-size: .78rem; color: #d97706; font-weight: 600; margin-top: .2rem; display: block; }
+.hint-aguardando { color: #6d28d9; }
+
+/* Botão compacto verde */
+.btn-sm-accent {
+  padding: .38rem .85rem;
+  font-size: .82rem;
+  font-weight: 700;
+  background: var(--color-primary, #22c55e);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-sm-accent:hover { background: #16a34a; }
+
+/* ── Modal de envio de foto ────────────────────────────────────── */
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  display: grid; place-items: center;
+  padding: 1rem; z-index: 100;
+  backdrop-filter: blur(2px);
+}
+.modal-foto {
+  max-width: 480px; width: 100%;
+  animation: fadeUp .25s ease;
+}
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+
+.modal-foto-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+.modal-foto-header h3 { margin: 0; font-size: 1.1rem; }
+.btn-close { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--color-muted,#64748b); padding:.25rem; }
+.btn-close:hover { color: var(--color-text, #1a1a1a); }
+
+/* Área de upload */
+.upload-area {
+  display: flex; flex-direction: column; align-items: center; gap: .6rem;
+  border: 2px dashed var(--color-border, #d1d5db);
+  border-radius: 12px;
+  padding: 2.5rem 1rem;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  transition: border-color .2s, background .2s, transform .15s;
+  background: #f9fafb;
+}
+.upload-area:hover { border-color: var(--color-primary, #22c55e); background: #f0fdf4; }
+.drag-ativo { border-color: var(--color-primary, #22c55e) !important; background: #f0fdf4 !important; transform: scale(1.01); }
+.upload-icon { font-size: 2.5rem; }
+
+/* Preview da foto selecionada */
+.foto-preview { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+.foto-preview img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px; }
+.btn-remove-foto { background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; border-radius:8px; padding:.35rem .8rem; font-size:.85rem; cursor:pointer; font-weight:600; }
+.btn-remove-foto:hover { background: #fee2e2; }
+
+.modal-foto-footer {
+  display: flex; justify-content: flex-end; gap: .5rem;
+  margin-top: 1.25rem; padding-top: 1rem;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
 </style>
