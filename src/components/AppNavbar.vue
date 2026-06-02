@@ -15,6 +15,7 @@ function logout() { auth.logout(); router.push('/') }
       <RouterLink to="/" class="brand">🌿 EcoProof</RouterLink>
       <nav class="links">
         <RouterLink to="/app/eventos">Eventos</RouterLink>
+        <RouterLink to="/app/pontos-verdes">Pontos Verdes</RouterLink>
         <template v-if="auth.isCidadao">
           <RouterLink to="/app/dashboard">Dashboard</RouterLink>
           <RouterLink to="/app/carteira">Carteira</RouterLink>

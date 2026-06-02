@@ -8,6 +8,7 @@ import { useToast } from '../composables/useToast'
 import StatusBadge from '../components/StatusBadge.vue'
 import NFTCard from '../components/NFTCard.vue'
 import ImageUpload from '../components/ImageUpload.vue'
+import { usePontosVerdesStore } from '../stores/pontosVerdes'
 
 // Blockchain stats
 const chainStats = ref(null)
@@ -23,6 +24,7 @@ const participacoes = ref([])
 const loadingLimpezas  = ref(true)
 const loadingNFTs      = ref(true)
 const loadingPartic    = ref(true)
+const loadingPontos    = ref(true)
 
 // Wallet
 const editingWallet  = ref(false)
@@ -33,6 +35,13 @@ const savingWallet   = ref(false)
 const fotoModal      = ref(null)   // participação selecionada
 const fotoFile       = ref(null)
 const enviandoFoto   = ref(false)
+
+// Ponto Verde
+const pontosVerdesStore = usePontosVerdesStore()
+const meusPontos       = computed(() => pontosVerdesStore.meusItems)
+const checkinModal     = ref(null)
+const checkinFile      = ref(null)
+const enviandoCheckin  = ref(false)
 
 const META = 500
 
@@ -54,6 +63,7 @@ onMounted(async () => {
     carregarNFTs(),
     carregarParticipacoes(),
     carregarChainStats(),
+    carregarMeusPontos(),
   ])
 })
 
@@ -152,6 +162,44 @@ async function enviarFotoParticipacao() {
   }
 }
 
+async function carregarMeusPontos() {
+  loadingPontos.value = true
+  try {
+    await pontosVerdesStore.fetchMeusPontos(auth.user?.id)
+  } catch (e) {
+    toast.error('Erro ao carregar pontos adotados: ' + e.message)
+  } finally {
+    loadingPontos.value = false
+  }
+}
+
+function abrirCheckin(ponto) {
+  checkinModal.value = ponto
+  checkinFile.value = null
+}
+
+async function enviarCheckinFoto() {
+  if (!checkinFile.value || !checkinModal.value) return
+  enviandoCheckin.value = true
+  try {
+    await pontosVerdesStore.enviarCheckin(checkinModal.value.id, checkinFile.value, auth.user)
+    toast.success('Check-in enviado com sucesso! 🌱')
+    checkinModal.value = null
+    checkinFile.value = null
+    await carregarMeusPontos()
+  } catch (e) {
+    toast.error('Erro ao enviar check-in: ' + e.message)
+  } finally {
+    enviandoCheckin.value = false
+  }
+}
+
+function calcularDiasRestantes(ponto) {
+  if (!ponto.proximo_checkin_limite) return 0
+  const diff = new Date(ponto.proximo_checkin_limite) - new Date()
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
+
 function verNFT(nft) {
   router.push(`/nft/${nft.token_id}`)
 }
@@ -177,6 +225,11 @@ function verNFT(nft) {
         <div class="stat-icon">🏆</div>
         <div class="stat-value">{{ formatPoints(pontos) }}</div>
         <div class="stat-label">Pontos totais</div>
+      </div>
+      <div class="stat-card stat-adocoes">
+        <div class="stat-icon">🌱</div>
+        <div class="stat-value">{{ meusPontos.length }}</div>
+        <div class="stat-label">Pontos adotados</div>
       </div>
       <div class="stat-card stat-limpezas">
         <div class="stat-icon">✅</div>
@@ -255,6 +308,92 @@ function verNFT(nft) {
       </div>
 
     </div>
+
+    <!-- ── Meus Pontos Verdes Adotados ────────────────────────────────────── -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Meus pontos verdes adotados</h2>
+        <RouterLink to="/app/pontos-verdes" class="link-sm">+ Adotar nova área</RouterLink>
+      </div>
+
+      <!-- Loading -->
+      <div v-if="loadingPontos" class="skeleton-list">
+        <div class="skeleton" v-for="i in 2" :key="i"></div>
+      </div>
+
+      <!-- Vazio -->
+      <div v-else-if="!meusPontos.length" class="empty-card">
+        <span class="empty-icon">🌱</span>
+        <div>
+          <strong>Você ainda não adotou nenhum ponto verde.</strong>
+          <p>Adote uma praça, canteiro ou trecho urbano e ajude a esverdear a cidade!</p>
+          <RouterLink to="/app/pontos-verdes" class="btn btn-primary" style="margin-top:.75rem">
+            Ver pontos no mapa
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- Lista de Adoções -->
+      <div v-else class="adocoes-list">
+        <div v-for="p in meusPontos" :key="p.id" class="card adocao-card-item">
+          <div class="adocao-item-main">
+            <div class="adocao-info-header">
+              <div>
+                <strong class="adocao-title">{{ p.nome }}</strong>
+                <span class="ponto-tag-inline" :class="p.categoria">{{ formatTipoAcao(p.categoria) }}</span>
+              </div>
+              <span class="adocao-status-text" :class="p.status">
+                {{ p.status === 'concluido' ? '🏆 Guardião Consagrado' : p.status === 'alerta' ? '🔴 Atrasado' : '🟢 Ativo' }}
+              </span>
+            </div>
+            
+            <p class="muted date-started" v-if="p.data_inicio">Adotado em: {{ formatDate(p.data_inicio) }}</p>
+
+            <!-- Linha do tempo de 3 meses -->
+            <div class="adocao-timeline-wrapper">
+              <span class="timeline-title">Evolução do Cuidado:</span>
+              <div class="timeline-steps">
+                <div class="timeline-step" :class="{ 'done': p.meses_concluidos >= 1, 'active': p.meses_concluidos === 0 && p.status !== 'concluido' }">
+                  <span class="step-num">1</span>
+                  <span class="step-label">Mês 1</span>
+                </div>
+                <div class="timeline-step-line" :class="{ 'done': p.meses_concluidos >= 1 }"></div>
+                <div class="timeline-step" :class="{ 'done': p.meses_concluidos >= 2, 'active': p.meses_concluidos === 1 && p.status !== 'concluido', 'blocked': p.meses_concluidos < 1 }">
+                  <span class="step-num">2</span>
+                  <span class="step-label">Mês 2</span>
+                </div>
+                <div class="timeline-step-line" :class="{ 'done': p.meses_concluidos >= 2 }"></div>
+                <div class="timeline-step" :class="{ 'done': p.meses_concluidos >= 3, 'active': p.meses_concluidos === 2 && p.status !== 'concluido', 'blocked': p.meses_concluidos < 2 }">
+                  <span class="step-num">3</span>
+                  <span class="step-label">Mês 3</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lado direito / Ações -->
+          <div class="adocao-item-actions">
+            <template v-if="p.status === 'concluido'">
+              <div class="nft-conquistado-badge">
+                <span>🏅 NFT emitido!</span>
+                <small class="token-num">Token ID: #{{ p.nft_token_id }}</small>
+              </div>
+            </template>
+            <template v-else>
+              <div class="checkin-warning" v-if="p.proximo_checkin_limite">
+                <span>⏳ Check-in {{ p.meses_concluidos + 1 }}º mês</span>
+                <small :class="{ 'red': calcularDiasRestantes(p) <= 2 }">
+                  Restam {{ calcularDiasRestantes(p) }} dias
+                </small>
+              </div>
+              <button class="btn btn-sm-accent btn-checkin" @click="abrirCheckin(p)">
+                📸 Fazer Check-in
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- ── Últimas Limpezas ───────────────────────────────────────────────── -->
     <section class="section">
@@ -443,6 +582,40 @@ function verNFT(nft) {
       </div>
     </Teleport>
 
+    <!-- ── Modal: Envio de check-in de ponto verde ───────────────────────── -->
+    <Teleport to="body">
+      <div v-if="checkinModal" class="backdrop" @click.self="checkinModal = null">
+        <div class="modal-foto card">
+          <div class="modal-foto-header">
+            <div>
+              <h3>📸 Enviar check-in de Ponto Verde</h3>
+              <p class="muted" style="margin:.2rem 0 0;font-size:.9rem">
+                {{ checkinModal.nome }} · Mês {{ checkinModal.meses_concluidos + 1 }} de 3
+              </p>
+            </div>
+            <button class="btn-close" @click="checkinModal = null">✕</button>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <ImageUpload label="Foto do local cuidado" @update:file="checkinFile = $event" />
+          </div>
+
+          <div class="modal-foto-footer">
+            <button class="btn btn-ghost" @click="checkinModal = null">Cancelar</button>
+            <button
+              id="btn-enviar-checkin"
+              class="btn btn-primary"
+              :disabled="!checkinFile || enviandoCheckin"
+              @click="enviarCheckinFoto"
+            >
+              <span v-if="enviandoCheckin" class="spinner-sm"></span>
+              {{ enviandoCheckin ? 'Enviando…' : 'Enviar Check-in' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -463,11 +636,102 @@ function verNFT(nft) {
 /* Stats */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
 @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+.stat-adocoes { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+
+/* Adoções */
+.adocoes-list { display: flex; flex-direction: column; gap: 1rem; }
+.adocao-card-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  border: 1px solid var(--color-border);
+  transition: box-shadow .15s;
+}
+.adocao-card-item:hover { box-shadow: var(--shadow-card); }
+.adocao-item-main { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+.adocao-info-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.adocao-title { font-size: 1.1rem; color: var(--color-primary); }
+.ponto-tag-inline {
+  display: inline-block;
+  padding: .15rem .45rem;
+  border-radius: 99px;
+  font-size: .68rem;
+  font-weight: 700;
+  margin-left: 0.5rem;
+}
+.ponto-tag-inline.praca { background: #e2f0e6; color: #1e4620; }
+.ponto-tag-inline.canteiro { background: #e8f5e9; color: #2e7d52; }
+.ponto-tag-inline.praia { background: #fff8e1; color: #f57f17; }
+.ponto-tag-inline.rio { background: #e3f2fd; color: #0d47a1; }
+.ponto-tag-inline.outro { background: #eceff1; color: #37474f; }
+
+.adocao-status-text { font-size: .78rem; font-weight: 700; text-transform: uppercase; }
+.adocao-status-text.ativo { color: #16a34a; }
+.adocao-status-text.alerta { color: #dc2626; }
+.adocao-status-text.concluido { color: #c9a84c; }
+
+.date-started { font-size: 0.8rem; margin: 0; }
+
+/* Timeline da Adoção */
+.adocao-timeline-wrapper { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.25rem; }
+.timeline-title { font-size: 0.78rem; font-weight: 600; color: var(--color-muted); }
+.timeline-steps { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.timeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: #f1f5f9;
+  padding: 0.25rem 0.6rem;
+  border-radius: 99px;
+}
+.timeline-step.done { background: #e8f5e9; color: #2e7d52; }
+.timeline-step.active { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.timeline-step.blocked { opacity: 0.5; }
+.step-num {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: currentColor;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.timeline-step-line { flex: 1; max-width: 40px; min-width: 15px; height: 3px; background: #e2e8f0; border-radius: 2px; }
+.timeline-step-line.done { background: #81c784; }
+
+.adocao-item-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+.checkin-warning { display: flex; flex-direction: column; align-items: flex-end; }
+.checkin-warning span { font-size: 0.82rem; font-weight: 600; color: var(--color-primary); }
+.checkin-warning small { font-size: 0.75rem; color: var(--color-muted); }
+.checkin-warning small.red { color: #dc2626; font-weight: 700; animation: flash 1s infinite alternate; }
+
+.nft-conquistado-badge { display: flex; flex-direction: column; align-items: flex-end; color: #c9a84c; }
+.nft-conquistado-badge span { font-weight: 700; font-size: 0.9rem; }
+.nft-conquistado-badge small { font-size: 0.72rem; color: var(--color-muted); }
+
+.btn-checkin { font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 8px; }
+
+@keyframes flash { from { opacity: 0.5; } to { opacity: 1; } }
+
+@media (max-width: 600px) {
+  .adocao-card-item { flex-direction: column; align-items: stretch; gap: 1rem; }
+  .adocao-item-actions { align-items: flex-start; }
+  .checkin-warning { align-items: flex-start; }
+}
 @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
 
 .stat-card {
