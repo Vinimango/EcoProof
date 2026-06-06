@@ -209,15 +209,22 @@ function verNFT(nft) {
   <div class="container dashboard">
 
     <!-- ── Cabeçalho ──────────────────────────────────────────────────────── -->
-    <header class="dash-head">
+  <header class="dash-head">
       <div>
         <h1>Olá, {{ auth.user?.name || '…' }} 🌿</h1>
         <p class="muted">Seu impacto ambiental, registrado em blockchain.</p>
       </div>
-      <RouterLink id="btn-registrar-limpeza" to="/app/registrar-limpeza" class="btn btn-primary">
-        + Registrar limpeza
-      </RouterLink>
-    </header>
+      
+      <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+        <RouterLink id="btn-registrar-limpeza" to="/app/registrar-limpeza" class="btn btn-primary">
+          + Registrar limpeza
+        </RouterLink>
+
+        <RouterLink to="/app/registrar-educacao" class="btn btn-ghost" style="border: 2px solid var(--color-primary); color: var(--color-primary); font-weight: 600;">
+          + Ação Educativa
+        </RouterLink>
+      </div>
+    </header> 
 
     <!-- ── Cards de Estatísticas ─────────────────────────────────────────── -->
     <div class="stats-grid">
