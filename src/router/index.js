@@ -8,6 +8,7 @@ const routes = [
 
   { path: '/app/dashboard', component: () => import('../views/CidadaoDashboard.vue'), meta: { roles: ['cidadao'] } },
   { path: '/app/registrar-limpeza', component: () => import('../views/RegistrarLimpeza.vue'), meta: { roles: ['cidadao'] } },
+  { path: '/app/registrar-educacao', component: () => import('../views/RegistrarEducacao.vue'), meta: { roles: ['cidadao', 'instituto'] } },
   { path: '/app/pontos-verdes', component: () => import('../views/PontosVerdes.vue'), meta: { public: true } },
   { path: '/app/adotar-area', component: () => import('../views/RegistrarAdocao.vue'), meta: { roles: ['cidadao'] } },
   { path: '/app/eventos', component: () => import('../views/Eventos.vue'), meta: { public: true } },
