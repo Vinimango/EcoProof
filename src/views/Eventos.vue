@@ -55,6 +55,11 @@ async function enviarFoto() {
 </script>
 <template>
   <div class="container">
+        <div style="margin-bottom: 1rem;">
+      <RouterLink to="/app/dashboard" style="color: var(--color-muted); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+        <span>←</span> Voltar ao Dashboard
+      </RouterLink>
+    </div>
     <header class="head">
       <div><h1>Eventos</h1><p class="muted">Participe de ações coletivas e ganhe NFTs.</p></div>
       <div class="toggle">

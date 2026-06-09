@@ -146,6 +146,11 @@ function formatCategoria(cat) {
 
 <template>
   <div class="container adocao-wizard-container">
+        <div style="margin-bottom: 1rem;">
+      <RouterLink to="/app/dashboard" style="color: var(--color-muted); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+        <span>←</span> Voltar ao Dashboard
+      </RouterLink>
+    </div>
     <h1>Adotar Ponto Verde</h1>
     
     <!-- Stepper Indicator -->

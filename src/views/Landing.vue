@@ -1,7 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+
 const stats = ref({ kg: 0, acoes: 0, cidadaos: 0 })
 const targets = { kg: 12480, acoes: 3210, cidadaos: 1875 }
+
 onMounted(() => {
   const start = performance.now(); const dur = 1500
   function tick(t) {
@@ -12,6 +17,7 @@ onMounted(() => {
   requestAnimationFrame(tick)
 })
 </script>
+
 <template>
   <div class="landing-page">
     <section class="hero">
@@ -20,11 +26,24 @@ onMounted(() => {
           <span class="tag">IPTU Verde · Blockchain</span>
           <h1>Ações ambientais comprovadas <em>on-chain</em>.</h1>
           <p class="lead">EcoProof conecta cidadãos e institutos para registrar limpezas, gerar NFTs como prova e desbloquear benefícios reais no IPTU Verde da sua cidade.</p>
+          
           <div class="cta">
-            <RouterLink to="/register?type=cidadao" class="btn btn-primary">Sou Cidadão</RouterLink>
-            <RouterLink to="/register?type=instituto" class="btn btn-accent">Sou Instituto</RouterLink>
+            <template v-if="auth.isAuthenticated">
+              <RouterLink 
+                :to="auth.isCidadao ? '/app/dashboard' : auth.isInstituto ? '/instituto/dashboard' : '/admin/dashboard'" 
+                class="btn btn-primary"
+                style="padding: 1rem 2rem; font-size: 1.1rem; border-radius: 99px;"
+              >
+                Ir para o meu Dashboard →
+              </RouterLink>
+            </template>
+            
+            <template v-else>
+              <RouterLink to="/register?type=cidadao" class="btn btn-primary">Sou Cidadão</RouterLink>
+              <RouterLink to="/register?type=instituto" class="btn btn-accent">Sou Instituto</RouterLink>
+            </template>
           </div>
-        </div>
+          </div>
         <div class="hero-art" aria-hidden="true">
           <div class="orb"></div>
           <div class="leaf">🌿</div>
@@ -61,11 +80,9 @@ onMounted(() => {
       </div>
     </section>
 
-    <footer class="footer">
-      <div class="container muted">© EcoProof — todas as ações comprovadas em blockchain.</div>
-    </footer>
-  </div>
+    </div>
 </template>
+
 <style scoped>
 .hero { background: linear-gradient(135deg, #1a3d2b, #2e7d52); color:#fff; padding: 4rem 0; }
 .hero-grid { display:grid; grid-template-columns: 1.3fr 1fr; gap:2rem; align-items:center; }
@@ -82,6 +99,5 @@ onMounted(() => {
 .impact-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:1rem; padding:2rem 1.25rem; text-align:center; }
 .impact-grid strong { display:block; font-family: var(--font-display); font-size:2.2rem; color: var(--color-primary); }
 .impact-grid span { color: var(--color-muted); }
-.footer { padding:2rem 0; }
 @media (max-width: 768px) { .hero-grid, .impact-grid { grid-template-columns: 1fr; } .hero-art{ display:none; } }
 </style>
