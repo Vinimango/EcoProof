@@ -241,6 +241,11 @@ function formatCategoria(cat) {
     
     <header class="page-header">
       <div>
+            <div style="margin-bottom: 1rem;">
+      <RouterLink to="/app/dashboard" style="color: var(--color-muted); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+        <span>←</span> Voltar ao Dashboard
+      </RouterLink>
+    </div>
         <h1>Adoção de Pontos Verdes 🌿</h1>
         <p class="muted">Adote e cuide de áreas verdes públicas por 3 meses para conquistar seu NFT de Guardião.</p>
       </div>
