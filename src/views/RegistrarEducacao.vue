@@ -16,6 +16,7 @@ const tipos = [
   { id:'palestra', label:'Palestra em Escola', emoji:'🏫' },
   { id:'oficina', label:'Oficina de Reciclagem', emoji:'♻️' },
   { id:'roda_conversa', label:'Roda de Conversa', emoji:'🗣️' },
+  { id:'mutirao_educativo', label:'Mutirão Educativo', emoji:'🤝' },
   { id:'outro', label:'Outro', emoji:'🌱' },
 ]
 
@@ -32,8 +33,8 @@ async function submit() {
   submitting.value = true; resultado.value = null
   const fd = new FormData()
   fd.append('tipo_acao', tipo.value)
-  fd.append('foto_evento', fotoEvento.value)
-  fd.append('participantes', numParticipantes.value)
+  fd.append('foto', fotoEvento.value)
+  fd.append('num_pessoas', numParticipantes.value)
   
   const msgs = ['Registrando evento…', 'Aguardando validação…', 'Gerando NFT de Impacto…']
   let i = 0; loadingMsg.value = msgs[0]

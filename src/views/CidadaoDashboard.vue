@@ -21,12 +21,14 @@ const router = useRouter()
 const limpezas    = ref([])
 const nfts        = ref([])
 const participacoes = ref([])
-const denuncias     = ref([]) // <-- Adicionado estado para denúncias
+const denuncias     = ref([])
+const educacoes     = ref([])
 const loadingLimpezas  = ref(true)
 const loadingNFTs      = ref(true)
 const loadingPartic    = ref(true)
 const loadingPontos    = ref(true)
-const loadingDenuncias = ref(true) // <-- Loading de denúncias
+const loadingDenuncias = ref(true)
+const loadingEducacoes = ref(true)
 
 // Wallet
 const editingWallet  = ref(false)
@@ -66,7 +68,8 @@ onMounted(async () => {
     carregarParticipacoes(),
     carregarChainStats(),
     carregarMeusPontos(),
-    carregarDenuncias(), 
+    carregarDenuncias(),
+    carregarEducacoes(),
   ])
 })
 
@@ -89,17 +92,27 @@ async function carregarLimpezas() {
   }
 }
 
-// Mock para a funcionalidade nova até o backend ficar pronto
 async function carregarDenuncias() {
   loadingDenuncias.value = true
   try {
-    // const res = await api.get('/denuncias/me')
-    // denuncias.value = res.items || []
-    denuncias.value = [] // Força vazio para mostrar o "Empty State" para a banca
+    const res = await api.get('/denuncias/me')
+    denuncias.value = Array.isArray(res) ? res : (res.items ?? [])
   } catch (e) {
     denuncias.value = []
   } finally {
     loadingDenuncias.value = false
+  }
+}
+
+async function carregarEducacoes() {
+  loadingEducacoes.value = true
+  try {
+    const res = await api.get('/educacao/me')
+    educacoes.value = Array.isArray(res) ? res : (res.items ?? [])
+  } catch (e) {
+    educacoes.value = []
+  } finally {
+    loadingEducacoes.value = false
   }
 }
 
@@ -426,6 +439,40 @@ function verNFT(nft) {
           </RouterLink>
         </div>
       </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Minhas Ações Educativas <span style="font-size: 0.8rem; background: #d1fae5; color: #065f46; padding: 0.15rem 0.5rem; border-radius: 99px; margin-left: 0.5rem;">Educação</span></h2>
+        <RouterLink to="/app/registrar-educacao" class="link-sm">+ Nova ação</RouterLink>
+      </div>
+
+      <div v-if="loadingEducacoes" class="skeleton-list">
+        <div class="skeleton" v-for="i in 1" :key="i"></div>
+      </div>
+
+      <div v-else-if="!educacoes.length" class="empty-card" style="border-color: #a7f3d0; background: #f0fdf9;">
+        <span class="empty-icon">📚</span>
+        <div>
+          <strong style="color: #065f46;">Você ainda não registrou ações educativas.</strong>
+          <p style="color: #047857;">Registre palestras, oficinas ou rodas de conversa e impacte pessoas com sua ação ambiental!</p>
+          <RouterLink to="/app/registrar-educacao" class="btn" style="background: var(--color-primary); color: #fff; margin-top:.75rem; border: none; font-weight: 600; padding: 0.4rem 1rem; border-radius: 8px;">
+            Registrar agora
+          </RouterLink>
+        </div>
+      </div>
+
+      <ul v-else class="limpeza-list">
+        <li v-for="e in educacoes.slice(0, 5)" :key="e.id" class="limpeza-item">
+          <div class="limpeza-img limpeza-img-placeholder">📚</div>
+          <div class="limpeza-info">
+            <strong>{{ e.tipo_acao || 'Ação Educativa' }}</strong>
+            <span class="muted">{{ e.num_pessoas }} pessoas impactadas</span>
+            <span class="muted">{{ formatDate(e.created_at) }}</span>
+          </div>
+          <StatusBadge :status="e.status" />
+        </li>
+      </ul>
     </section>
 
     <section class="section">
