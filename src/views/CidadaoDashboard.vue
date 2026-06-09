@@ -21,10 +21,12 @@ const router = useRouter()
 const limpezas    = ref([])
 const nfts        = ref([])
 const participacoes = ref([])
+const denuncias     = ref([]) // <-- Adicionado estado para denúncias
 const loadingLimpezas  = ref(true)
 const loadingNFTs      = ref(true)
 const loadingPartic    = ref(true)
 const loadingPontos    = ref(true)
+const loadingDenuncias = ref(true) // <-- Loading de denúncias
 
 // Wallet
 const editingWallet  = ref(false)
@@ -64,6 +66,7 @@ onMounted(async () => {
     carregarParticipacoes(),
     carregarChainStats(),
     carregarMeusPontos(),
+    carregarDenuncias(), 
   ])
 })
 
@@ -77,7 +80,6 @@ async function carregarChainStats() {
 async function carregarLimpezas() {
   loadingLimpezas.value = true
   try {
-    // GET /limpezas/me retorna { items, total, page, ... }
     const res = await api.get('/limpezas/me?page=1&page_size=10')
     limpezas.value = Array.isArray(res) ? res : (res.items ?? [])
   } catch (e) {
@@ -87,10 +89,23 @@ async function carregarLimpezas() {
   }
 }
 
+// Mock para a funcionalidade nova até o backend ficar pronto
+async function carregarDenuncias() {
+  loadingDenuncias.value = true
+  try {
+    // const res = await api.get('/denuncias/me')
+    // denuncias.value = res.items || []
+    denuncias.value = [] // Força vazio para mostrar o "Empty State" para a banca
+  } catch (e) {
+    denuncias.value = []
+  } finally {
+    loadingDenuncias.value = false
+  }
+}
+
 async function carregarNFTs() {
   loadingNFTs.value = true
   try {
-    // GET /users/me/nfts retorna array de NFTs
     const res = await api.get('/users/me/nfts')
     nfts.value = Array.isArray(res) ? res : (res.items ?? [])
   } catch (e) {
@@ -103,11 +118,9 @@ async function carregarNFTs() {
 async function carregarParticipacoes() {
   loadingPartic.value = true
   try {
-    // GET /eventos/minhas-participacoes retorna { items, total, ... }
     const res = await api.get('/eventos/minhas-participacoes?page=1&page_size=5')
     participacoes.value = Array.isArray(res) ? res : (res.items ?? [])
   } catch (e) {
-    // Rota pode conflitar com parâmetro de rota UUID no backend (422) — trata silenciosamente
     participacoes.value = []
   } finally {
     loadingPartic.value = false
@@ -124,7 +137,6 @@ async function saveWallet() {
   if (!walletDraft.value.trim()) { toast.warn('Informe um endereço de wallet.'); return }
   savingWallet.value = true
   try {
-    // PATCH /users/me usa query params: ?wallet_address=0x...
     await auth.updateWallet(walletDraft.value.trim())
     toast.success('Wallet atualizada com sucesso!')
     editingWallet.value = false
@@ -134,7 +146,6 @@ async function saveWallet() {
     savingWallet.value = false
   }
 }
-
 
 function abrirEnvioFoto(participacao) {
   fotoModal.value = participacao
@@ -208,8 +219,7 @@ function verNFT(nft) {
 <template>
   <div class="container dashboard">
 
-    <!-- ── Cabeçalho ──────────────────────────────────────────────────────── -->
-  <header class="dash-head">
+    <header class="dash-head">
       <div>
         <h1>Olá, {{ auth.user?.name || '…' }} 🌿</h1>
         <p class="muted">Seu impacto ambiental, registrado em blockchain.</p>
@@ -223,10 +233,13 @@ function verNFT(nft) {
         <RouterLink to="/app/registrar-educacao" class="btn btn-ghost" style="border: 2px solid var(--color-primary); color: var(--color-primary); font-weight: 600;">
           + Ação Educativa
         </RouterLink>
+
+        <RouterLink to="/app/registrar-denuncia" class="btn btn-ghost" style="border: 2px solid #d97706; color: #d97706; font-weight: 600;">
+          🚨 Denunciar
+        </RouterLink>
       </div>
     </header> 
 
-    <!-- ── Cards de Estatísticas ─────────────────────────────────────────── -->
     <div class="stats-grid">
       <div class="stat-card stat-pontos">
         <div class="stat-icon">🏆</div>
@@ -255,10 +268,8 @@ function verNFT(nft) {
       </div>
     </div>
 
-    <!-- ── Pontos + Wallet ────────────────────────────────────────────────── -->
     <div class="grid two">
 
-      <!-- Pontos IPTU Verde -->
       <div class="card">
         <h3>Pontos rumo ao IPTU Verde</h3>
         <div class="points-row">
@@ -276,7 +287,6 @@ function verNFT(nft) {
         </p>
       </div>
 
-      <!-- Wallet -->
       <div class="card">
         <h3>Wallet Polygon</h3>
         <template v-if="!editingWallet">
@@ -316,19 +326,16 @@ function verNFT(nft) {
 
     </div>
 
-    <!-- ── Meus Pontos Verdes Adotados ────────────────────────────────────── -->
     <section class="section">
       <div class="section-head">
         <h2>Meus pontos verdes adotados</h2>
         <RouterLink to="/app/pontos-verdes" class="link-sm">+ Adotar nova área</RouterLink>
       </div>
 
-      <!-- Loading -->
       <div v-if="loadingPontos" class="skeleton-list">
         <div class="skeleton" v-for="i in 2" :key="i"></div>
       </div>
 
-      <!-- Vazio -->
       <div v-else-if="!meusPontos.length" class="empty-card">
         <span class="empty-icon">🌱</span>
         <div>
@@ -340,7 +347,6 @@ function verNFT(nft) {
         </div>
       </div>
 
-      <!-- Lista de Adoções -->
       <div v-else class="adocoes-list">
         <div v-for="p in meusPontos" :key="p.id" class="card adocao-card-item">
           <div class="adocao-item-main">
@@ -356,7 +362,6 @@ function verNFT(nft) {
             
             <p class="muted date-started" v-if="p.data_inicio">Adotado em: {{ formatDate(p.data_inicio) }}</p>
 
-            <!-- Linha do tempo de 3 meses -->
             <div class="adocao-timeline-wrapper">
               <span class="timeline-title">Evolução do Cuidado:</span>
               <div class="timeline-steps">
@@ -378,7 +383,6 @@ function verNFT(nft) {
             </div>
           </div>
 
-          <!-- Lado direito / Ações -->
           <div class="adocao-item-actions">
             <template v-if="p.status === 'concluido'">
               <div class="nft-conquistado-badge">
@@ -402,19 +406,38 @@ function verNFT(nft) {
       </div>
     </section>
 
-    <!-- ── Últimas Limpezas ───────────────────────────────────────────────── -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Minhas Denúncias <span style="font-size: 0.8rem; background: #fef3c7; color: #b45309; padding: 0.15rem 0.5rem; border-radius: 99px; margin-left: 0.5rem;">Fiscalização</span></h2>
+        <RouterLink to="/app/registrar-denuncia" class="link-sm" style="color: #d97706;">+ Nova denúncia</RouterLink>
+      </div>
+
+      <div v-if="loadingDenuncias" class="skeleton-list">
+        <div class="skeleton" v-for="i in 1" :key="i"></div>
+      </div>
+
+      <div v-else-if="!denuncias.length" class="empty-card" style="border-color: #fde68a; background: #fffdf2;">
+        <span class="empty-icon">🚨</span>
+        <div>
+          <strong style="color: #92400e;">Você ainda não registrou denúncias.</strong>
+          <p style="color: #b45309;">Fotografe descarte ilegal ou poluição. Quando o órgão competente resolver o problema, você ganha seu NFT de Fiscal Ambiental!</p>
+          <RouterLink to="/app/registrar-denuncia" class="btn" style="background: #d97706; color: #fff; margin-top:.75rem; border: none; font-weight: 600; padding: 0.4rem 1rem; border-radius: 8px;">
+            Denunciar problema
+          </RouterLink>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
       <div class="section-head">
         <h2>Últimas limpezas</h2>
         <RouterLink to="/app/registrar-limpeza" class="link-sm">+ Nova limpeza</RouterLink>
       </div>
 
-      <!-- Loading -->
       <div v-if="loadingLimpezas" class="skeleton-list">
         <div class="skeleton" v-for="i in 3" :key="i"></div>
       </div>
 
-      <!-- Vazia -->
       <div v-else-if="!limpezas.length" class="empty-card">
         <span class="empty-icon">🗺️</span>
         <div>
@@ -426,7 +449,6 @@ function verNFT(nft) {
         </div>
       </div>
 
-      <!-- Lista -->
       <ul v-else class="limpeza-list">
         <li v-for="l in limpezas.slice(0, 5)" :key="l.id" class="limpeza-item">
           <div class="limpeza-img" v-if="l.foto_depois_url">
@@ -442,8 +464,6 @@ function verNFT(nft) {
       </ul>
     </section>
 
-    <!-- ── Meus NFTs ──────────────────────────────────────────────────────── -->
-    <!-- ── Blockchain Stats ────────────────────────────────────────────── -->
     <div v-if="chainStats" class="chain-stats-bar">
       <div class="chain-stat">
         <span class="chain-stat-icon">⛓️</span>
@@ -474,12 +494,10 @@ function verNFT(nft) {
         <RouterLink to="/app/carteira" class="link-sm">Ver todos →</RouterLink>
       </div>
 
-      <!-- Loading -->
       <div v-if="loadingNFTs" class="nft-grid">
         <div class="skeleton nft-skeleton" v-for="i in 3" :key="i"></div>
       </div>
 
-      <!-- Vazia -->
       <div v-else-if="!nfts.length" class="empty-card">
         <span class="empty-icon">🎖️</span>
         <div>
@@ -488,7 +506,6 @@ function verNFT(nft) {
         </div>
       </div>
 
-      <!-- Grid de NFTs -->
       <div v-else class="nft-grid">
         <NFTCard
           v-for="nft in nfts.slice(0, 6)"
@@ -499,7 +516,6 @@ function verNFT(nft) {
       </div>
     </section>
 
-    <!-- ── Participações em Eventos ────────────────────────────────────────── -->
     <section class="section">
       <div class="section-head">
         <h2>Participações em eventos</h2>
@@ -524,11 +540,9 @@ function verNFT(nft) {
       <ul v-else class="limpeza-list">
         <li v-for="p in participacoes" :key="p.id" class="limpeza-item partic-item">
 
-          <!-- Ícone / thumb -->
           <div class="limpeza-img limpeza-img-placeholder" v-if="!p.foto_url">📅</div>
           <img v-else :src="p.foto_url" class="limpeza-img partic-foto" alt="Foto enviada" />
 
-          <!-- Informações -->
           <div class="limpeza-info">
             <strong>{{ p.evento_titulo || 'Evento' }}</strong>
             <span class="muted">{{ formatDate(p.checkin_at) }}</span>
@@ -540,7 +554,6 @@ function verNFT(nft) {
             </span>
           </div>
 
-          <!-- Status + Botão -->
           <div class="partic-right">
             <StatusBadge :status="p.status" />
             <button
@@ -555,7 +568,6 @@ function verNFT(nft) {
       </ul>
     </section>
 
-    <!-- ── Modal: Envio de foto de participação ──────────────────────────── -->
     <Teleport to="body">
       <div v-if="fotoModal" class="backdrop" @click.self="fotoModal = null">
         <div class="modal-foto card">
@@ -589,7 +601,6 @@ function verNFT(nft) {
       </div>
     </Teleport>
 
-    <!-- ── Modal: Envio de check-in de ponto verde ───────────────────────── -->
     <Teleport to="body">
       <div v-if="checkinModal" class="backdrop" @click.self="checkinModal = null">
         <div class="modal-foto card">
@@ -966,5 +977,4 @@ function verNFT(nft) {
   margin-top: 1.25rem; padding-top: 1rem;
   border-top: 1px solid var(--color-border, #e2e8f0);
 }
-
 </style>
