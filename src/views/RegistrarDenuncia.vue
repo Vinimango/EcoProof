@@ -16,10 +16,12 @@ const resultado = ref(null)
 const loadingMsg = ref('')
 
 const tipos = [
-  { id:'descarte_irregular', label:'Descarte Irregular', emoji:'🗑️' },
+  { id:'descarte_ilegal', label:'Descarte Irregular', emoji:'🗑️' },
   { id:'esgoto', label:'Esgoto / Poluição', emoji:'☣️' },
   { id:'queimada', label:'Foco de Queimada', emoji:'🔥' },
   { id:'desmatamento', label:'Desmatamento', emoji:'🪓' },
+  { id:'poluicao_agua', label:'Poluição da Água', emoji:'💧' },
+  { id:'poluicao_ar', label:'Poluição do Ar', emoji:'🌫️' },
   { id:'outro', label:'Outro Problema', emoji:'⚠️' },
 ]
 
@@ -36,10 +38,9 @@ function next() {
 async function submit() {
   submitting.value = true; resultado.value = null
   const fd = new FormData()
-  fd.append('tipo', tipo.value)
-  fd.append('localizacao', localizacao.value)
-  fd.append('descricao', descricao.value)
-  fd.append('foto', fotoFile.value)
+  fd.append('tipo_problema', tipo.value)
+  fd.append('descricao', descricao.value ? `[${localizacao.value}] ${descricao.value}` : localizacao.value)
+  fd.append('foto_problema', fotoFile.value)
   
   const msgs = ['Registrando evidências na blockchain…', 'Criptografando localização…', 'Notificando órgão ambiental competente…']
   let i = 0; loadingMsg.value = msgs[0]
@@ -49,8 +50,8 @@ async function submit() {
     const r = await apiFormData('/denuncias', fd) 
     resultado.value = r
   } catch (e) { 
-    console.warn("Mocking sucesso da denúncia:", e)
-    resultado.value = { status: 'pendente_orgao' }
+    toast.error(e.message)
+    step.value = 2
   } finally { 
     clearInterval(t)
     submitting.value = false 
@@ -58,7 +59,7 @@ async function submit() {
 }
 
 function reiniciar() { 
-  step.value = 1; tipo.value = ''; localizacao.value = ''; descricao.value = ''; fotoFile = null; resultado.value = null 
+  step.value = 1; tipo.value = ''; localizacao.value = ''; descricao.value = ''; fotoFile.value = null; resultado.value = null 
 }
 </script>
 
