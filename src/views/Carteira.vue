@@ -37,7 +37,7 @@ const total = computed(() => auth.user?.pontos || 0)
           <dl>
             <dt>Token ID</dt><dd>#{{ selected.token_id }}</dd>
             <dt>Assinado por</dt><dd>{{ selected.assinado_por }}</dd>
-            <dt>Tx Hash</dt><dd><a :href="`https://etherscan.io/tx/${selected.tx_hash}`" target="_blank">{{ truncateHash(selected.tx_hash) }} ↗</a></dd>
+            <dt>Tx Hash</dt><dd><a :href="`https://sepolia.etherscan.io/tx/${selected.tx_hash}`" target="_blank">{{ truncateHash(selected.tx_hash) }} ↗</a></dd>
             <dt>Metadata</dt><dd><a :href="selected.metadata_url" target="_blank">Ver JSON ↗</a></dd>
           </dl>
         </div>
